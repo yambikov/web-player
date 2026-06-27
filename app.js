@@ -632,6 +632,28 @@
     });
   }
 
+  function setupViewportHeightSync() {
+    const root = document.documentElement;
+
+    function syncAppHeight() {
+      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      if (h > 0) {
+        root.style.setProperty('--app-height', `${Math.round(h)}px`);
+      }
+    }
+
+    syncAppHeight();
+    window.addEventListener('resize', syncAppHeight);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(syncAppHeight, 100);
+      setTimeout(syncAppHeight, 300);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncAppHeight);
+      window.visualViewport.addEventListener('scroll', syncAppHeight);
+    }
+  }
+
   function setupDockedControlsHeightSync(player) {
     const stage = App.elements.playerStage;
     if (!stage) return;
@@ -664,9 +686,24 @@
       syncDockedControlsHeight();
     }
 
+    function triggerLayoutSync() {
+      syncDockedControlsHeight();
+      if (player && !player.isDisposed()) {
+        player.trigger('resize');
+      }
+    }
+
     player.ready(attach);
     player.on('resize', syncDockedControlsHeight);
     window.addEventListener('resize', syncDockedControlsHeight);
+    window.addEventListener('orientationchange', () => {
+      setTimeout(triggerLayoutSync, 100);
+      setTimeout(triggerLayoutSync, 300);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', syncDockedControlsHeight);
+      window.visualViewport.addEventListener('scroll', syncDockedControlsHeight);
+    }
 
     App.dockedControlsHeightSync = syncDockedControlsHeight;
   }
@@ -1501,6 +1538,7 @@
   // ===========================================================================
 
   async function bootstrap() {
+    setupViewportHeightSync();
     initPlayer();
     setupTapOverlay();
     wireUI();

@@ -114,6 +114,10 @@ npx serve .
   (`webkitplaybacktargetavailabilitychanged`).
 - Картинка в картинке (PiP) недоступна в PWA («На экран Домой») — ограничение
   WebKit; кнопка скрыта в standalone‑режиме. В Safari и на desktop PiP работает.
+- В PWA при inline‑воспроизведении iOS показывает системный индикатор Now Playing
+  в Dynamic Island (иконка звука). Убрать его из web‑кода нельзя — это ограничение
+  WebKit. В нативном полноэкранном режиме (`webkitEnterFullscreen`) поведение может
+  отличаться.
 
 ## Поддерживаемые браузеры
 

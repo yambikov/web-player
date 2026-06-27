@@ -47,11 +47,20 @@
 
   --topbar-h-mobile: 96px;
   --docked-controls-height: calc(28px + 6px + var(--ctrl-btn) + var(--ctrl-bar-pad-top) + var(--ctrl-bar-pad-bottom) + 22px);
+  --app-height: 100vh;
+}
+
+@media not (display-mode: standalone) {
+  :root { --app-height: 100dvh; }
+}
+
+@media (display-mode: standalone) {
+  :root { --app-height: 100vh; }
 }
 
 * { box-sizing: border-box; }
 
-html, body { height: 100%; }
+html, body { height: var(--app-height); }
 
 body {
   margin: 0;
@@ -65,9 +74,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
-
-  height: 100vh;
-  height: 100dvh;
   overflow: hidden;
 }
 
@@ -146,11 +152,17 @@ button {
 
 /* ===== App layout ===== */
 .app {
-  height: 100%;
+  height: var(--app-height);
   display: flex;
   flex-direction: column;
   padding-top: var(--safe-top);
   overflow: hidden;
+}
+
+@media (max-width: 899px) and (orientation: landscape) {
+  .app:not(.is-fullwindow):not(.is-fullscreen) {
+    padding-bottom: var(--safe-bottom);
+  }
 }
 
 /* ===== Top bar ===== */
@@ -353,6 +365,8 @@ button {
   min-height: 0;
   height: 100%;
   width: 100%;
+  overflow: hidden;
+  isolation: isolate;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-control-bar {
@@ -363,6 +377,7 @@ button {
   grid-row: 2;
   grid-column: 1;
   width: 100%;
+  z-index: 4;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-tech {
@@ -380,6 +395,7 @@ button {
   object-position: center center !important;
   align-self: center;
   justify-self: center;
+  z-index: 1;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-poster,
@@ -392,9 +408,12 @@ button {
 .player-stage.is-docked-controls #player.video-js .vjs-poster,
 .player-stage.is-docked-controls #player.video-js .vjs-text-track-display {
   position: absolute !important;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--docked-controls-height);
   width: 100%;
-  height: 100%;
+  height: auto;
 }
 
 .player-stage.is-docked-controls .tap-overlay {
