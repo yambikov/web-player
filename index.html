@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>Web Player</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <link href="https://vjs.zencdn.net/8.10.0/video-js.css" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=19" />
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar: series dropdown + episode pill on a single row -->
+    <header class="topbar" id="topbar">
+      <div class="topbar__row">
+        <button class="pill pill--series ui-pill-btn" id="serialBtn" aria-haspopup="listbox" aria-controls="seriesDropdown" aria-expanded="false" aria-label="Выбрать сериал">
+          <span class="pill__label" id="serialTitle">Сериал</span>
+          <span class="pill__chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+          </span>
+        </button>
+        <button class="pill pill--episode ui-pill-btn" id="episodeBtn" aria-haspopup="dialog" aria-controls="seriesSheet" aria-label="Выбрать эпизод">
+          <span class="pill__code" id="episodeCode">S01E01</span>
+          <span class="pill__sep" aria-hidden="true">·</span>
+          <span class="pill__name" id="episodeName">—</span>
+          <span class="pill__chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+          </span>
+        </button>
+      </div>
+      <div class="status-line" id="statusLine" hidden></div>
+    </header>
+
+    <!-- Series dropdown -->
+    <div class="dropdown" id="seriesDropdown" role="listbox" aria-label="Сериалы" hidden></div>
+
+    <!-- Player area -->
+    <main class="player-wrap" id="playerWrap">
+      <div class="player-stage">
+        <video
+          id="player"
+          class="video-js vjs-default-skin vjs-big-play-centered"
+          playsinline
+          webkit-playsinline
+          x5-playsinline
+          preload="metadata"
+        ></video>
+
+        <!-- Custom tap zones overlay (left / center / right) -->
+        <div class="tap-overlay" id="tapOverlay" aria-hidden="true">
+          <div class="tap-overlay__zone tap-overlay__zone--left" data-zone="left"></div>
+          <div class="tap-overlay__zone tap-overlay__zone--center" data-zone="center"></div>
+          <div class="tap-overlay__zone tap-overlay__zone--right" data-zone="right"></div>
+
+          <!-- Visual feedback indicators -->
+          <div class="tap-fb tap-fb--left" id="tapFbLeft" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/></svg>
+            <span>-10 сек</span>
+          </div>
+          <div class="tap-fb tap-fb--right" id="tapFbRight" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="32" height="32"><path fill="currentColor" d="M13 6v12l8.5-6L13 6zM4 6v12l8.5-6L4 6z"/></svg>
+            <span>+10 сек</span>
+          </div>
+        </div>
+
+        <!-- Center play button (visible when paused) -->
+        <button class="center-play ui-icon-btn" id="centerPlayBtn" aria-label="Воспроизвести" hidden>
+          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+            <path fill="currentColor" d="M8 5.5v13a1 1 0 0 0 1.55.83l10-6.5a1 1 0 0 0 0-1.66l-10-6.5A1 1 0 0 0 8 5.5z"/>
+          </svg>
+        </button>
+
+        <!-- Error overlay -->
+        <div class="error-overlay" id="errorOverlay" hidden>
+          <div class="error-overlay__inner">
+            <div class="error-overlay__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M12 2 1 21h22L12 2zm0 6 8.53 14H3.47L12 8zm-1 4v4h2v-4h-2zm0 6v2h2v-2h-2z"/></svg>
+            </div>
+            <div class="error-overlay__title">Не удалось загрузить видео</div>
+            <div class="error-overlay__hint" id="errorHint"></div>
+            <button class="btn btn--primary ui-pill-btn" id="retryBtn">Попробовать снова</button>
+          </div>
+        </div>
+
+        <!-- Series finished overlay -->
+        <div class="finished-overlay" id="finishedOverlay" hidden>
+          <div class="finished-overlay__inner">
+            <div class="finished-overlay__title">Сериал завершён</div>
+            <div class="finished-overlay__hint">Это была последняя серия. Выберите другой сериал или эпизод.</div>
+            <div class="finished-overlay__actions">
+              <button class="btn btn--secondary ui-pill-btn" id="finishedRestartBtn">Сначала</button>
+              <button class="btn btn--primary ui-pill-btn" id="finishedChooseBtn">Выбрать сериал</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Series bottom sheet -->
+    <div class="sheet" id="seriesSheet" role="dialog" aria-modal="true" aria-labelledby="seriesSheetTitle" hidden>
+      <div class="sheet__backdrop" data-close-sheet></div>
+      <div class="sheet__panel">
+        <div class="sheet__header">
+          <div class="sheet__handle" aria-hidden="true"></div>
+          <h2 class="sheet__title" id="seriesSheetTitle">Эпизоды</h2>
+          <button class="sheet__close ui-icon-btn" data-close-sheet aria-label="Закрыть">
+            <svg viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 6.4 17.6 5 12 10.6 6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12z"/></svg>
+          </button>
+        </div>
+        <div class="sheet__body">
+          <div class="seasons" id="seasons"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sleep timer popover -->
+    <div class="popover" id="sleepPopover" role="dialog" aria-label="Таймер сна" hidden>
+      <div class="popover__title">Таймер сна</div>
+      <div class="popover__list">
+        <button class="popover__item ui-list-item" data-sleep="10">10 минут</button>
+        <button class="popover__item ui-list-item" data-sleep="20">20 минут</button>
+        <button class="popover__item ui-list-item" data-sleep="30">30 минут</button>
+        <button class="popover__item ui-list-item" data-sleep="60">60 минут</button>
+        <button class="popover__item popover__item--off ui-list-item" data-sleep="0">Выключить</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://vjs.zencdn.net/8.10.0/video.min.js"></script>
+  <script src="app.js?v=12"></script>
+</body>
+</html>

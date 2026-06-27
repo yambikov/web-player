@@ -1,0 +1,20 @@
+{
+  "defaultSlug": "office",
+  "series": [
+    {
+      "slug": "office",
+      "title": "The Office",
+      "dataPath": "data/office.json"
+    },
+    {
+      "slug": "always-sunny",
+      "title": "It's Always Sunny in Philadelphia",
+      "dataPath": "data/allways_sunny.json"
+    },
+    {
+      "slug": "parks",
+      "title": "Parks and Recreation",
+      "dataPath": "data/parks.json"
+    }
+  ]
+}
