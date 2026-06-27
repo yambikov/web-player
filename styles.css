@@ -421,15 +421,23 @@ button {
 
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
   html:not(.is-ios) .player-stage.is-docked-controls {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
     aspect-ratio: auto;
     height: auto;
-    max-height: 100%;
+    max-height: calc(100% - 32px);
     width: 100%;
     max-width: 1280px;
   }
 
   html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
     height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-tech {
@@ -438,15 +446,26 @@ button {
     left: auto !important;
     right: auto !important;
     bottom: auto !important;
+    flex: 0 0 auto;
     aspect-ratio: 16 / 9;
     height: auto !important;
     max-height: none !important;
     width: 100% !important;
+    object-fit: contain !important;
   }
 
   html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-control-bar {
     position: relative !important;
+    flex: 0 0 auto;
     bottom: auto !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+  }
+
+  html:not(.is-ios) .player-stage.is-docked-controls .tap-overlay {
+    bottom: var(--docked-controls-height);
   }
 
   html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-poster,
@@ -456,9 +475,9 @@ button {
     top: 0;
     left: 0;
     right: 0;
-    bottom: var(--docked-controls-height);
     width: 100%;
-    height: auto;
+    height: calc(100% - var(--docked-controls-height));
+    bottom: auto;
   }
 }
 

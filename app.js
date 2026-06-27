@@ -11,6 +11,8 @@
   const MANIFEST_PATH = 'data/index.json';
   const SKIP_SECONDS = 10;
   const DOUBLE_TAP_MS = 350;
+  const SWIPE_MIN_DISTANCE = 56;
+  const SWIPE_MAX_MS = 600;
   const SAVE_THROTTLE_MS = 4000;
   const RESTORE_LOOKBACK_SECONDS = 2;
   const RESTART_THRESHOLD_RATIO = 0.95;
@@ -509,6 +511,7 @@
     player.on('play', () => updateCenterPlay());
     player.on('pause', () => updateCenterPlay());
     player.on('loadstart', () => updateCenterPlay());
+    player.on('loadedmetadata', () => updateCenterPlay());
     player.on('fullscreenchange', () => {
       if (App.fsCustomButton) {
         App.fsCustomButton.setExpanded(
@@ -658,6 +661,18 @@
     }
   }
 
+  function isDesktopDockedLayout() {
+    return !isIOS && window.matchMedia('(min-width: 900px) and (hover: hover) and (pointer: fine)').matches;
+  }
+
+  function clearDockedTechInlineStyles(player, bar, tech) {
+    const barEl = bar || player.controlBar?.el?.();
+    const techEl = tech || getPlayerVideoEl(player);
+    const props = ['position', 'top', 'left', 'right', 'bottom', 'width', 'height', 'max-height', 'object-fit'];
+    if (techEl) props.forEach(p => techEl.style.removeProperty(p));
+    if (barEl) ['position', 'bottom', 'left', 'right', 'width'].forEach(p => barEl.style.removeProperty(p));
+  }
+
   function setupDockedControlsHeightSync(player) {
     const stage = App.elements.playerStage;
     if (!stage) return;
@@ -671,6 +686,11 @@
       const bar = controlBarEl || player.controlBar?.el?.();
       const tech = getPlayerVideoEl(player);
       if (!bar || !tech) return;
+
+      if (isDesktopDockedLayout()) {
+        clearDockedTechInlineStyles(player, bar, tech);
+        return;
+      }
 
       const barHeight = Math.ceil(bar.getBoundingClientRect().height);
       if (barHeight <= 0) return;
@@ -733,7 +753,10 @@
     player.on('loadeddata', syncDockedControlsHeight);
     player.on('loadedmetadata', syncDockedControlsHeight);
     player.on('play', syncDockedControlsHeight);
-    window.addEventListener('resize', syncDockedControlsHeight);
+    window.addEventListener('resize', () => {
+      if (isDesktopDockedLayout()) clearDockedTechInlineStyles(player);
+      syncDockedControlsHeight();
+    });
     window.addEventListener('orientationchange', () => {
       setTimeout(triggerLayoutSync, 100);
       setTimeout(triggerLayoutSync, 300);
@@ -749,7 +772,7 @@
         const tech = getPlayerVideoEl(player);
         if (!tech) return;
         const mo = new MutationObserver(() => {
-          if (!stage.classList.contains('is-docked-controls')) return;
+          if (!stage.classList.contains('is-docked-controls') || isDesktopDockedLayout()) return;
           if (enforceTimer) clearTimeout(enforceTimer);
           enforceTimer = setTimeout(() => {
             enforceTimer = null;
@@ -801,17 +824,29 @@
 
     updateEpisodeInfo(ep);
 
+    App._episodeLoadToken = (App._episodeLoadToken || 0) + 1;
+    const token = App._episodeLoadToken;
+
     App.player.src({ src: ep.url, type: 'video/mp4' });
+    updateCenterPlay();
+
+    if (autoplay) {
+      const p = App.player.play();
+      if (p && typeof p.catch === 'function') p.catch(() => { /* blocked until metadata */ });
+    }
+
     App.player.one('loadedmetadata', () => {
+      if (token !== App._episodeLoadToken) return;
       if (startAt > 0) {
         const duration = App.player.duration() || 0;
         const target = Math.min(Math.max(0, startAt), Math.max(0, duration - 1));
         App.player.currentTime(target);
       }
-      if (autoplay) {
+      if (autoplay && App.player.paused()) {
         const p = App.player.play();
         if (p && typeof p.catch === 'function') p.catch(() => { /* autoplay blocked */ });
       }
+      updateCenterPlay();
     });
 
     SessionStore.update({
@@ -854,6 +889,22 @@
       return;
     }
     loadEpisode(nextIdx, { autoplay: true });
+  }
+
+  function playAdjacentEpisode(delta) {
+    if (!App.currentSeriesData || App.currentEpisodeIndex < 0) return false;
+
+    const list = App.currentSeriesData.flat;
+    const nextIdx = App.currentEpisodeIndex + delta;
+
+    if (nextIdx < 0 || nextIdx >= list.length) {
+      showEpisodeSwipeFeedback(delta > 0 ? 'next-none' : 'prev-none');
+      return false;
+    }
+
+    loadEpisode(nextIdx, { autoplay: true });
+    showEpisodeSwipeFeedback(delta > 0 ? 'next' : 'prev');
+    return true;
   }
 
   // ===========================================================================
@@ -1102,17 +1153,39 @@
       bumpPlayerActivity();
     }
 
+    function resolveTapZone(clientX, clientY) {
+      const zones = overlay.querySelectorAll('.tap-overlay__zone');
+      for (const zoneEl of zones) {
+        const rect = zoneEl.getBoundingClientRect();
+        if (clientX >= rect.left && clientX <= rect.right
+          && clientY >= rect.top && clientY <= rect.bottom) {
+          return zoneEl.dataset.zone;
+        }
+      }
+      return null;
+    }
+
+    function handleEpisodeSwipe(dx, dy, dt) {
+      if (dt > SWIPE_MAX_MS) return false;
+      if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return false;
+      if (Math.abs(dx) <= Math.abs(dy) * 1.2) return false;
+
+      sideTapState = null;
+      bumpPlayerActivity();
+      playAdjacentEpisode(dx > 0 ? 1 : -1);
+      return true;
+    }
+
     overlay.addEventListener('pointerdown', (e) => {
-      const target = e.target.closest('.tap-overlay__zone');
-      if (!target) return;
+      if (!e.target.closest('.tap-overlay')) return;
       pointerDownInfo = {
         x: e.clientX,
         y: e.clientY,
-        zone: target.dataset.zone,
+        zone: resolveTapZone(e.clientX, e.clientY),
         pointerType: e.pointerType,
         t: Date.now(),
       };
-    }, { passive: true });
+    }, { passive: true, capture: true });
 
     overlay.addEventListener('pointerup', (e) => {
       if (!pointerDownInfo) return;
@@ -1123,6 +1196,8 @@
       const pointerType = pointerDownInfo.pointerType || e.pointerType;
       pointerDownInfo = null;
 
+      if (handleEpisodeSwipe(dx, dy, dt)) return;
+
       if (Math.hypot(dx, dy) > 16 || dt > 600) return;
       if (!zone) return;
 
@@ -1132,7 +1207,7 @@
       }
 
       handleSideDoubleTap(zone, pointerType);
-    }, { passive: true });
+    }, { passive: true, capture: true });
 
     overlay.addEventListener('dblclick', (e) => {
       const target = e.target.closest('.tap-overlay__zone');
@@ -1155,12 +1230,37 @@
   }
 
   let fbTimers = { left: null, right: null };
+  const EPISODE_SWIPE_LABELS = {
+    next: 'Следующая',
+    prev: 'Предыдущая',
+    'next-none': 'Конец',
+    'prev-none': 'Начало',
+  };
+
   function showTapFeedback(side) {
     const el = side === 'left' ? App.elements.tapFbLeft : App.elements.tapFbRight;
     if (!el) return;
+    const span = el.querySelector('span');
+    if (span) span.textContent = side === 'left' ? '-10 сек' : '+10 сек';
     el.classList.add('is-active');
     if (fbTimers[side]) clearTimeout(fbTimers[side]);
     fbTimers[side] = setTimeout(() => el.classList.remove('is-active'), 500);
+  }
+
+  function showEpisodeSwipeFeedback(kind) {
+    const isNext = kind.startsWith('next');
+    const side = isNext ? 'right' : 'left';
+    const el = isNext ? App.elements.tapFbRight : App.elements.tapFbLeft;
+    if (!el) return;
+    const span = el.querySelector('span');
+    const defaultText = isNext ? '+10 сек' : '-10 сек';
+    if (span) span.textContent = EPISODE_SWIPE_LABELS[kind] || defaultText;
+    el.classList.add('is-active');
+    if (fbTimers[side]) clearTimeout(fbTimers[side]);
+    fbTimers[side] = setTimeout(() => {
+      el.classList.remove('is-active');
+      if (span) span.textContent = defaultText;
+    }, 600);
   }
 
   // ===========================================================================
@@ -1306,9 +1406,9 @@
     const ended = player.ended();
     const errorVisible = !App.elements.errorOverlay.hidden;
     const finishedVisible = !App.elements.finishedOverlay.hidden;
-    let hasStarted = false;
-    try { hasStarted = player.played() && player.played().length > 0; } catch (_e) { hasStarted = false; }
-    btn.hidden = !paused || ended || errorVisible || finishedVisible || !hasStarted;
+    let isReady = App.currentEpisodeIndex >= 0;
+    try { isReady = player.readyState() >= 1; } catch (_e) { /* keep fallback */ }
+    btn.hidden = !paused || ended || errorVisible || finishedVisible || !isReady;
     btn.setAttribute('aria-label', paused ? 'Воспроизвести' : 'Пауза');
   }
 
