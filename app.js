@@ -633,12 +633,14 @@
   }
 
   function setupViewportHeightSync() {
+    if (!isIOS && !isStandalonePWA()) return;
+
     const root = document.documentElement;
 
     function syncAppHeight() {
-      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const h = window.innerHeight;
       if (h > 0) {
-        root.style.setProperty('--app-height', `${Math.round(h)}px`);
+        root.style.setProperty('--app-height', `${h}px`);
       }
     }
 
@@ -650,7 +652,6 @@
     });
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', syncAppHeight);
-      window.visualViewport.addEventListener('scroll', syncAppHeight);
     }
   }
 
@@ -660,6 +661,19 @@
 
     let controlBarEl = null;
     let observer = null;
+
+    function enforceDockedTechLayout() {
+      if (!stage.classList.contains('is-docked-controls')) return;
+      const tech = getPlayerVideoEl(player);
+      if (!tech) return;
+      tech.style.removeProperty('top');
+      tech.style.removeProperty('left');
+      tech.style.removeProperty('right');
+      tech.style.removeProperty('bottom');
+      tech.style.removeProperty('width');
+      tech.style.removeProperty('height');
+      tech.style.removeProperty('position');
+    }
 
     function syncDockedControlsHeight() {
       if (!stage.classList.contains('is-docked-controls')) {
@@ -673,7 +687,12 @@
       const height = Math.ceil(bar.getBoundingClientRect().height);
       if (height > 0) {
         stage.style.setProperty('--docked-controls-height', `${height}px`);
+        const playerEl = player.el();
+        if (playerEl) {
+          playerEl.style.setProperty('--docked-controls-height', `${height}px`);
+        }
       }
+      enforceDockedTechLayout();
     }
 
     function attach() {
@@ -695,6 +714,8 @@
 
     player.ready(attach);
     player.on('resize', syncDockedControlsHeight);
+    player.on('loadeddata', syncDockedControlsHeight);
+    player.on('play', syncDockedControlsHeight);
     window.addEventListener('resize', syncDockedControlsHeight);
     window.addEventListener('orientationchange', () => {
       setTimeout(triggerLayoutSync, 100);

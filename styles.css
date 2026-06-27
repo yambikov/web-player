@@ -153,16 +153,11 @@ button {
 /* ===== App layout ===== */
 .app {
   height: var(--app-height);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding-top: var(--safe-top);
   overflow: hidden;
-}
-
-@media (max-width: 899px) and (orientation: landscape) {
-  .app:not(.is-fullwindow):not(.is-fullscreen) {
-    padding-bottom: var(--safe-bottom);
-  }
 }
 
 /* ===== Top bar ===== */
@@ -330,7 +325,7 @@ button {
   overflow: hidden;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
   .player-wrap { padding: 16px; background: var(--bg); }
   .player-stage {
     border-radius: var(--radius-lg);
@@ -355,18 +350,18 @@ button {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 .player-stage.is-docked-controls #player.video-js {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  grid-template-columns: 1fr;
+  display: flex !important;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
   width: 100%;
+  position: relative;
   overflow: hidden;
-  isolation: isolate;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-control-bar {
@@ -374,39 +369,30 @@ button {
   bottom: auto !important;
   left: auto !important;
   right: auto !important;
-  grid-row: 2;
-  grid-column: 1;
+  top: auto !important;
+  flex: 0 0 auto;
   width: 100%;
+  margin-top: auto;
   z-index: 4;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-tech {
-  grid-row: 1;
-  grid-column: 1;
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  bottom: auto !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: var(--docked-controls-height) !important;
   width: 100% !important;
-  height: 100% !important;
-  max-height: 100%;
+  height: auto !important;
+  max-height: none !important;
   object-fit: contain !important;
   object-position: center center !important;
-  align-self: center;
-  justify-self: center;
   z-index: 1;
 }
 
 .player-stage.is-docked-controls #player.video-js .vjs-poster,
 .player-stage.is-docked-controls #player.video-js .vjs-text-track-display,
 .player-stage.is-docked-controls #player.video-js .vjs-loading-spinner {
-  grid-row: 1;
-  grid-column: 1;
-}
-
-.player-stage.is-docked-controls #player.video-js .vjs-poster,
-.player-stage.is-docked-controls #player.video-js .vjs-text-track-display {
   position: absolute !important;
   top: 0;
   left: 0;
@@ -414,6 +400,14 @@ button {
   bottom: var(--docked-controls-height);
   width: 100%;
   height: auto;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.player-stage.is-docked-controls #player.video-js .vjs-poster {
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
 }
 
 .player-stage.is-docked-controls .tap-overlay {
@@ -429,7 +423,7 @@ button {
   bottom: var(--docked-controls-height);
 }
 
-@media (min-width: 900px) {
+@media (min-width: 900px) and (hover: hover) and (pointer: fine) {
   .player-stage.is-docked-controls {
     aspect-ratio: auto;
     height: auto;
@@ -440,21 +434,46 @@ button {
 
   .player-stage.is-docked-controls #player.video-js {
     height: auto;
-    grid-template-rows: auto auto;
   }
 
   .player-stage.is-docked-controls #player.video-js .vjs-tech {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
     aspect-ratio: 16 / 9;
     height: auto !important;
     width: 100% !important;
     max-height: none;
   }
+
+  .player-stage.is-docked-controls #player.video-js .vjs-control-bar {
+    margin-top: 0;
+  }
+
+  .player-stage.is-docked-controls #player.video-js .vjs-poster,
+  .player-stage.is-docked-controls #player.video-js .vjs-text-track-display,
+  .player-stage.is-docked-controls #player.video-js .vjs-loading-spinner {
+    position: absolute !important;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: var(--docked-controls-height);
+    width: 100%;
+    height: auto;
+  }
 }
 
-@media (max-width: 899px) {
+@media (hover: none), (pointer: coarse) {
   .player-wrap {
     align-items: stretch;
     justify-content: stretch;
+  }
+
+  .player-stage.is-docked-controls {
+    height: 100%;
+    max-height: 100%;
   }
 }
 
