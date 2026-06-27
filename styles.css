@@ -353,58 +353,54 @@ button {
   min-height: 0;
 }
 
-.player-stage.is-docked-controls #player.video-js {
-  display: flex !important;
-  flex-direction: column;
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
   width: 100%;
-  position: relative;
   overflow: hidden;
 }
 
-.player-stage.is-docked-controls #player.video-js .vjs-control-bar {
-  position: relative !important;
-  bottom: auto !important;
-  left: auto !important;
-  right: auto !important;
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-control-bar {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
   top: auto !important;
-  flex: 0 0 auto;
-  width: 100%;
-  margin-top: auto;
+  width: 100% !important;
   z-index: 4;
 }
 
-.player-stage.is-docked-controls #player.video-js .vjs-tech {
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-tech {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
-  right: 0 !important;
-  bottom: var(--docked-controls-height) !important;
+  right: auto !important;
+  bottom: auto !important;
   width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
+  height: calc(100% - var(--docked-controls-height)) !important;
+  max-height: calc(100% - var(--docked-controls-height)) !important;
   object-fit: contain !important;
   object-position: center center !important;
   z-index: 1;
 }
 
-.player-stage.is-docked-controls #player.video-js .vjs-poster,
-.player-stage.is-docked-controls #player.video-js .vjs-text-track-display,
-.player-stage.is-docked-controls #player.video-js .vjs-loading-spinner {
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-poster,
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-text-track-display,
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-loading-spinner {
   position: absolute !important;
   top: 0;
   left: 0;
   right: 0;
-  bottom: var(--docked-controls-height);
   width: 100%;
-  height: auto;
+  height: calc(100% - var(--docked-controls-height));
+  bottom: auto;
   z-index: 2;
   pointer-events: none;
 }
 
-.player-stage.is-docked-controls #player.video-js .vjs-poster {
+.player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-poster {
   background-size: contain;
   background-position: center center;
   background-repeat: no-repeat;
@@ -424,7 +420,7 @@ button {
 }
 
 @media (min-width: 900px) and (hover: hover) and (pointer: fine) {
-  .player-stage.is-docked-controls {
+  html:not(.is-ios) .player-stage.is-docked-controls {
     aspect-ratio: auto;
     height: auto;
     max-height: 100%;
@@ -432,11 +428,11 @@ button {
     max-width: 1280px;
   }
 
-  .player-stage.is-docked-controls #player.video-js {
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar {
     height: auto;
   }
 
-  .player-stage.is-docked-controls #player.video-js .vjs-tech {
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-tech {
     position: relative !important;
     top: auto !important;
     left: auto !important;
@@ -444,17 +440,18 @@ button {
     bottom: auto !important;
     aspect-ratio: 16 / 9;
     height: auto !important;
+    max-height: none !important;
     width: 100% !important;
-    max-height: none;
   }
 
-  .player-stage.is-docked-controls #player.video-js .vjs-control-bar {
-    margin-top: 0;
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-control-bar {
+    position: relative !important;
+    bottom: auto !important;
   }
 
-  .player-stage.is-docked-controls #player.video-js .vjs-poster,
-  .player-stage.is-docked-controls #player.video-js .vjs-text-track-display,
-  .player-stage.is-docked-controls #player.video-js .vjs-loading-spinner {
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-poster,
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-text-track-display,
+  html:not(.is-ios) .player-stage.is-docked-controls #player.video-js.vjs-docked-bar .vjs-loading-spinner {
     position: absolute !important;
     top: 0;
     left: 0;
@@ -465,16 +462,14 @@ button {
   }
 }
 
-@media (hover: none), (pointer: coarse) {
-  .player-wrap {
-    align-items: stretch;
-    justify-content: stretch;
-  }
+html.is-ios .player-wrap {
+  align-items: stretch;
+  justify-content: stretch;
+}
 
-  .player-stage.is-docked-controls {
-    height: 100%;
-    max-height: 100%;
-  }
+html.is-ios .player-stage.is-docked-controls {
+  height: 100%;
+  max-height: 100%;
 }
 
 /* ===== Video.js skin overrides ===== */

@@ -546,6 +546,9 @@
     }
 
     syncImmersiveMode();
+    if (App.player) {
+      App.player.addClass('vjs-docked-bar');
+    }
     return player;
   }
 
@@ -664,15 +667,28 @@
 
     function enforceDockedTechLayout() {
       if (!stage.classList.contains('is-docked-controls')) return;
+
+      const bar = controlBarEl || player.controlBar?.el?.();
       const tech = getPlayerVideoEl(player);
-      if (!tech) return;
-      tech.style.removeProperty('top');
-      tech.style.removeProperty('left');
-      tech.style.removeProperty('right');
-      tech.style.removeProperty('bottom');
-      tech.style.removeProperty('width');
-      tech.style.removeProperty('height');
-      tech.style.removeProperty('position');
+      if (!bar || !tech) return;
+
+      const barHeight = Math.ceil(bar.getBoundingClientRect().height);
+      if (barHeight <= 0) return;
+
+      const videoHeight = `calc(100% - ${barHeight}px)`;
+      tech.style.setProperty('position', 'absolute', 'important');
+      tech.style.setProperty('top', '0', 'important');
+      tech.style.setProperty('left', '0', 'important');
+      tech.style.setProperty('width', '100%', 'important');
+      tech.style.setProperty('height', videoHeight, 'important');
+      tech.style.setProperty('max-height', videoHeight, 'important');
+      tech.style.setProperty('object-fit', 'contain', 'important');
+
+      bar.style.setProperty('position', 'absolute', 'important');
+      bar.style.setProperty('bottom', '0', 'important');
+      bar.style.setProperty('left', '0', 'important');
+      bar.style.setProperty('right', '0', 'important');
+      bar.style.setProperty('width', '100%', 'important');
     }
 
     function syncDockedControlsHeight() {
@@ -715,6 +731,7 @@
     player.ready(attach);
     player.on('resize', syncDockedControlsHeight);
     player.on('loadeddata', syncDockedControlsHeight);
+    player.on('loadedmetadata', syncDockedControlsHeight);
     player.on('play', syncDockedControlsHeight);
     window.addEventListener('resize', syncDockedControlsHeight);
     window.addEventListener('orientationchange', () => {
@@ -724,6 +741,23 @@
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', syncDockedControlsHeight);
       window.visualViewport.addEventListener('scroll', syncDockedControlsHeight);
+    }
+
+    if (isIOS) {
+      let enforceTimer = null;
+      player.ready(() => {
+        const tech = getPlayerVideoEl(player);
+        if (!tech) return;
+        const mo = new MutationObserver(() => {
+          if (!stage.classList.contains('is-docked-controls')) return;
+          if (enforceTimer) clearTimeout(enforceTimer);
+          enforceTimer = setTimeout(() => {
+            enforceTimer = null;
+            syncDockedControlsHeight();
+          }, 50);
+        });
+        mo.observe(tech, { attributes: true, attributeFilter: ['style'] });
+      });
     }
 
     App.dockedControlsHeightSync = syncDockedControlsHeight;
@@ -1365,6 +1399,12 @@
     if (App.elements.playerStage) {
       App.elements.playerStage.classList.toggle('is-docked-controls', !immersive);
     }
+    if (App.player && !App.player.isDisposed()) {
+      App.player.toggleClass('vjs-docked-bar', !immersive);
+      try {
+        App.player.fill(immersive);
+      } catch (_e) { /* noop */ }
+    }
     syncImmersiveControls();
     if (App.dockedControlsHeightSync) App.dockedControlsHeightSync();
   }
@@ -1559,6 +1599,7 @@
   // ===========================================================================
 
   async function bootstrap() {
+    document.documentElement.classList.toggle('is-ios', isIOS);
     setupViewportHeightSync();
     initPlayer();
     setupTapOverlay();
