@@ -664,7 +664,7 @@ button {
   width: 92px;
   height: 92px;
   transform: translate(-50%, -50%);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -677,7 +677,14 @@ button {
   cursor: pointer;
   transition: transform 0.18s var(--easing), background-color 0.18s var(--easing);
   padding: 0;
-  padding-left: 4px; /* optical centering for the play triangle */
+}
+.center-play svg {
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  /* Play triangle is visually heavy on the left — nudge right for optical center */
+  transform: translateX(2px);
 }
 .center-play[hidden] { display: none; }
 .center-play:hover,
