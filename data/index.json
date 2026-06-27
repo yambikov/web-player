@@ -3,17 +3,17 @@
   "series": [
     {
       "slug": "office",
-      "title": "The Office",
+      "title": "Офис",
       "dataPath": "data/office.json"
     },
     {
       "slug": "always-sunny",
-      "title": "It's Always Sunny in Philadelphia",
+      "title": "В Филадельфии всегда солнечно",
       "dataPath": "data/allways_sunny.json"
     },
     {
       "slug": "parks",
-      "title": "Parks and Recreation",
+      "title": "Парки и зоны отдыха",
       "dataPath": "data/parks.json"
     }
   ]

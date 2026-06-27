@@ -46,6 +46,7 @@
   --ctrl-bar-pad-bottom: calc(10px + var(--safe-bottom));
 
   --topbar-h-mobile: 96px;
+  --docked-controls-height: calc(28px + 6px + var(--ctrl-btn) + var(--ctrl-bar-pad-top) + var(--ctrl-bar-pad-bottom) + 22px);
 }
 
 * { box-sizing: border-box; }
@@ -330,9 +331,112 @@ button {
 }
 
 #player.video-js {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   font-family: inherit;
+}
+
+/* ===== Docked control bar (normal mode — panel below video) ===== */
+.player-stage.is-docked-controls {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.player-stage.is-docked-controls #player.video-js {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.player-stage.is-docked-controls #player.video-js .vjs-control-bar {
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  grid-row: 2;
+  grid-column: 1;
+  width: 100%;
+}
+
+.player-stage.is-docked-controls #player.video-js .vjs-tech {
+  grid-row: 1;
+  grid-column: 1;
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-height: 100%;
+  object-fit: contain !important;
+  object-position: center center !important;
+  align-self: center;
+  justify-self: center;
+}
+
+.player-stage.is-docked-controls #player.video-js .vjs-poster,
+.player-stage.is-docked-controls #player.video-js .vjs-text-track-display,
+.player-stage.is-docked-controls #player.video-js .vjs-loading-spinner {
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.player-stage.is-docked-controls #player.video-js .vjs-poster,
+.player-stage.is-docked-controls #player.video-js .vjs-text-track-display {
+  position: absolute !important;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.player-stage.is-docked-controls .tap-overlay {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--docked-controls-height);
+  padding-bottom: 0;
+}
+
+.player-stage.is-docked-controls .error-overlay,
+.player-stage.is-docked-controls .finished-overlay {
+  bottom: var(--docked-controls-height);
+}
+
+@media (min-width: 900px) {
+  .player-stage.is-docked-controls {
+    aspect-ratio: auto;
+    height: auto;
+    max-height: 100%;
+    width: 100%;
+    max-width: 1280px;
+  }
+
+  .player-stage.is-docked-controls #player.video-js {
+    height: auto;
+    grid-template-rows: auto auto;
+  }
+
+  .player-stage.is-docked-controls #player.video-js .vjs-tech {
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+    width: 100% !important;
+    max-height: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .player-wrap {
+    align-items: stretch;
+    justify-content: stretch;
+  }
 }
 
 /* ===== Video.js skin overrides ===== */
@@ -601,21 +705,127 @@ button {
   }
 }
 
-.app.is-fullwindow .video-js .vjs-control-bar {
+/* ===== Full-window / immersive mode (fallback when iOS native FS unavailable) ===== */
+html.is-immersive {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  scrollbar-width: none;
+}
+html.is-immersive::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+body.is-immersive {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+.app.is-fullwindow,
+.app.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  padding-top: 0;
+}
+.app.is-fullwindow .topbar,
+.app.is-fullscreen .topbar { display: none; }
+.app.is-fullwindow .player-wrap,
+.app.is-fullscreen .player-wrap { padding: 0; }
+.app.is-fullwindow .player-stage,
+.app.is-fullscreen .player-stage {
+  border-radius: 0;
+  max-width: none;
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.player-stage:fullscreen,
+.player-stage:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border-radius: 0;
+  background: #000;
+}
+.player-stage:fullscreen .video-js,
+.player-stage:-webkit-full-screen .video-js {
+  width: 100%;
+  height: 100%;
+}
+
+.app.is-fullwindow .video-js .vjs-control-bar,
+.app.is-fullscreen .video-js .vjs-control-bar,
+.player-stage:fullscreen .video-js .vjs-control-bar,
+.player-stage:-webkit-full-screen .video-js .vjs-control-bar {
   --ctrl-bar-pad-bottom: calc(12px + var(--safe-bottom));
 }
 
-/* ===== Tap overlay =====
- * Sits below control bar so its buttons are clickable.
- */
+/* Auto-hide control bar in immersive fullscreen while playing */
+.is-immersive .video-js.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-control-bar {
+  opacity: 0 !important;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity 0.28s var(--easing), transform 0.28s var(--easing), visibility 0.28s;
+}
+.is-immersive .video-js.vjs-user-active .vjs-control-bar,
+.is-immersive .video-js.vjs-has-started.vjs-paused .vjs-control-bar {
+  opacity: 1 !important;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition: opacity 0.2s var(--easing), transform 0.2s var(--easing), visibility 0.2s;
+}
+.is-immersive .video-js.vjs-user-inactive.vjs-playing {
+  cursor: none;
+}
+.is-immersive .video-js.vjs-user-active {
+  cursor: default;
+}
+
+/* ===== Tap overlay (immersive mode — inset above overlay control bar) ===== */
+.is-immersive .tap-overlay {
+  padding-bottom: var(--docked-controls-height);
+}
+
 .tap-overlay {
   position: absolute;
   inset: 0;
   display: flex;
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
+  box-sizing: border-box;
 }
-.video-js .vjs-control-bar { z-index: 3; }
+
+/* Center play — positioned inside tap-overlay (= exact video viewport) */
+.tap-overlay .center-play,
+.tap-overlay .ui-icon-btn.center-play {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 92px;
+  height: 92px;
+  transform: none;
+  pointer-events: auto;
+}
+
+.tap-overlay .center-play:hover,
+.tap-overlay .ui-icon-btn.center-play:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.04);
+}
+
+.tap-overlay .center-play:active,
+.tap-overlay .ui-icon-btn.center-play:active {
+  transform: scale(0.96);
+}
+.video-js .vjs-control-bar { z-index: 4; }
 .video-js .vjs-text-track-display { z-index: 2; }
 
 .tap-overlay__zone {
@@ -655,15 +865,9 @@ button {
 .tap-fb--right { right: 24px; }
 .tap-fb.is-active { opacity: 1; transform: translateY(-50%) scale(1); }
 
-/* ===== Center play button (paused state) ===== */
+/* ===== Center play button (paused state) — base styles ===== */
 .center-play,
 .ui-icon-btn.center-play {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 92px;
-  height: 92px;
-  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -683,29 +887,16 @@ button {
   width: 40px;
   height: 40px;
   flex-shrink: 0;
-  /* Play triangle is visually heavy on the left — nudge right for optical center */
   transform: translateX(2px);
+  padding-right: 6px;
 }
 .center-play[hidden] { display: none; }
-.center-play:hover,
-.ui-icon-btn.center-play:hover { background: rgba(255, 255, 255, 0.2); transform: translate(-50%, -50%) scale(1.04); }
-.center-play:active,
-.ui-icon-btn.center-play:active { transform: translate(-50%, -50%) scale(0.96); }
-.center-play:focus-visible,
-.ui-icon-btn.center-play:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-
-/* ===== Full-window mode (iOS / fallback) ===== */
-.app.is-fullwindow {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: #000;
-  padding-top: 0;
+.tap-overlay .center-play:focus-visible,
+.tap-overlay .ui-icon-btn.center-play:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
-.app.is-fullwindow .topbar { display: none; }
-.app.is-fullwindow .player-wrap { padding: 0; }
-.app.is-fullwindow .player-stage { border-radius: 0; max-width: none; aspect-ratio: auto; height: 100%; }
-body.is-fullwindow { overflow: hidden; }
+
 
 /* ===== Error & finished overlays ===== */
 .error-overlay,

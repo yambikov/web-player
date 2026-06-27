@@ -10,10 +10,11 @@
   const STORAGE_KEY = 'web-player.session.v1';
   const MANIFEST_PATH = 'data/index.json';
   const SKIP_SECONDS = 10;
-  const TAP_DEBOUNCE_MS = 220;
+  const DOUBLE_TAP_MS = 350;
   const SAVE_THROTTLE_MS = 4000;
   const RESTORE_LOOKBACK_SECONDS = 2;
   const RESTART_THRESHOLD_RATIO = 0.95;
+  const IMMERSIVE_CONTROLS_HIDE_MS = 2500;
 
   const isIOS = (() => {
     const ua = navigator.userAgent || '';
@@ -65,7 +66,13 @@
     pipExit: '<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H3V5h18v14h-8v2h8c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4 12H9V7h8v8z"/></svg>',
   };
 
+  function isStandalonePWA() {
+    return window.navigator.standalone === true
+      || window.matchMedia('(display-mode: standalone)').matches;
+  }
+
   function isPiPSupported() {
+    if (isStandalonePWA()) return false;
     return document.pictureInPictureEnabled !== false
       && typeof HTMLVideoElement.prototype.requestPictureInPicture === 'function';
   }
@@ -427,6 +434,7 @@
     pipButton: null,
     isFullWindow: false,
     isIOSNativeFullscreen: false,
+    dockedControlsHeightSync: null,
   };
 
   // ===========================================================================
@@ -482,6 +490,8 @@
     setupPlayButtonA11y(player);
     setupPictureInPicture(player);
     setupIOSNativeFullscreen(player);
+    setupImmersiveControlHooks(player);
+    setupDockedControlsHeightSync(player);
     player.one('ready', () => setupPlayButtonA11y(player));
 
     // Force inline playback on iOS (extra safety)
@@ -535,7 +545,130 @@
       if (airBtn) airBtn.hide();
     }
 
+    syncImmersiveMode();
     return player;
+  }
+
+  function isImmersiveControlsMode() {
+    return (App.isFullWindow || isAppFullscreen()) && !App.isIOSNativeFullscreen;
+  }
+
+  let immersiveControlsTimer = null;
+
+  function clearImmersiveControlsTimer() {
+    if (immersiveControlsTimer !== null) {
+      clearTimeout(immersiveControlsTimer);
+      immersiveControlsTimer = null;
+    }
+  }
+
+  function setImmersiveControlsVisible(visible) {
+    const player = App.player;
+    if (!player) return;
+    player.toggleClass('vjs-user-active', visible);
+    player.toggleClass('vjs-user-inactive', !visible);
+  }
+
+  function scheduleImmersiveControlsHide() {
+    clearImmersiveControlsTimer();
+    if (!isImmersiveControlsMode() || !App.player) return;
+
+    const player = App.player;
+    if (player.paused() || player.ended()) {
+      setImmersiveControlsVisible(true);
+      return;
+    }
+
+    immersiveControlsTimer = setTimeout(() => {
+      immersiveControlsTimer = null;
+      if (!isImmersiveControlsMode() || !App.player) return;
+      if (App.player.paused() || App.player.ended()) return;
+      setImmersiveControlsVisible(false);
+    }, IMMERSIVE_CONTROLS_HIDE_MS);
+  }
+
+  function bumpImmersiveControlsActivity() {
+    if (!isImmersiveControlsMode() || !App.player) return;
+    setImmersiveControlsVisible(true);
+    scheduleImmersiveControlsHide();
+  }
+
+  function syncImmersiveControls() {
+    if (!App.player) return;
+
+    if (isImmersiveControlsMode()) {
+      setImmersiveControlsVisible(true);
+      scheduleImmersiveControlsHide();
+    } else {
+      clearImmersiveControlsTimer();
+      setImmersiveControlsVisible(true);
+    }
+  }
+
+  function setupImmersiveControlAutoHide() {
+    const stage = App.elements.playerStage;
+    if (!stage) return;
+
+    const onActivity = throttle(() => {
+      bumpImmersiveControlsActivity();
+    }, 150);
+
+    stage.addEventListener('mousemove', onActivity);
+    stage.addEventListener('touchstart', onActivity, { passive: true });
+  }
+
+  function setupImmersiveControlHooks(player) {
+    player.on('play', () => {
+      if (isImmersiveControlsMode()) scheduleImmersiveControlsHide();
+    });
+    player.on('pause', () => {
+      if (isImmersiveControlsMode()) {
+        clearImmersiveControlsTimer();
+        setImmersiveControlsVisible(true);
+      }
+    });
+    player.on('useractive', () => {
+      if (isImmersiveControlsMode()) scheduleImmersiveControlsHide();
+    });
+  }
+
+  function setupDockedControlsHeightSync(player) {
+    const stage = App.elements.playerStage;
+    if (!stage) return;
+
+    let controlBarEl = null;
+    let observer = null;
+
+    function syncDockedControlsHeight() {
+      if (!stage.classList.contains('is-docked-controls')) {
+        stage.style.removeProperty('--docked-controls-height');
+        return;
+      }
+
+      const bar = controlBarEl || player.controlBar?.el?.();
+      if (!bar) return;
+
+      const height = Math.ceil(bar.getBoundingClientRect().height);
+      if (height > 0) {
+        stage.style.setProperty('--docked-controls-height', `${height}px`);
+      }
+    }
+
+    function attach() {
+      controlBarEl = player.controlBar?.el?.() || null;
+      if (!controlBarEl) return;
+
+      if (observer) observer.disconnect();
+      observer = new ResizeObserver(syncDockedControlsHeight);
+      observer.observe(controlBarEl);
+      syncDockedControlsHeight();
+    }
+
+    player.ready(attach);
+    player.on('resize', syncDockedControlsHeight);
+    window.addEventListener('resize', syncDockedControlsHeight);
+
+    App.dockedControlsHeightSync = syncDockedControlsHeight;
   }
 
   // ===========================================================================
@@ -817,28 +950,39 @@
 
   function setupTapOverlay() {
     const overlay = App.elements.tapOverlay;
-    let lastTap = 0;
     let pointerDownInfo = null;
+    let sideTapState = null;
+    let lastSeekAt = 0;
 
-    function handleZone(zone) {
+    function bumpPlayerActivity() {
+      const player = App.player;
+      if (!player) return;
+      try {
+        if (isImmersiveControlsMode()) bumpImmersiveControlsActivity();
+        else player.userActive(true);
+      } catch (_e) { /* noop */ }
+    }
+
+    function togglePlayPause() {
+      const player = App.player;
+      if (!player) return;
+      bumpPlayerActivity();
+      if (player.paused()) {
+        const p = player.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } else {
+        player.pause();
+      }
+    }
+
+    function seekSide(zone) {
       const now = Date.now();
-      if (now - lastTap < TAP_DEBOUNCE_MS) return;
-      lastTap = now;
+      if (now - lastSeekAt < 120) return;
+      lastSeekAt = now;
 
       const player = App.player;
       if (!player) return;
-
-      try { player.userActive(true); } catch (_e) { /* noop */ }
-
-      if (zone === 'center') {
-        if (player.paused()) {
-          const p = player.play();
-          if (p && typeof p.catch === 'function') p.catch(() => {});
-        } else {
-          player.pause();
-        }
-        return;
-      }
+      bumpPlayerActivity();
 
       const dur = player.duration() || 0;
       const cur = player.currentTime() || 0;
@@ -852,27 +996,63 @@
       }
     }
 
-    // Use pointer events for cross-device reliability (iOS sometimes drops
-    // synthetic clicks on transparent overlays).
+    function handleSideDoubleTap(zone, pointerType) {
+      if (pointerType === 'mouse') return;
+
+      const now = Date.now();
+      if (sideTapState && sideTapState.zone === zone && now - sideTapState.time <= DOUBLE_TAP_MS) {
+        sideTapState = null;
+        seekSide(zone);
+        return;
+      }
+
+      sideTapState = { zone, time: now };
+      bumpPlayerActivity();
+    }
+
     overlay.addEventListener('pointerdown', (e) => {
       const target = e.target.closest('.tap-overlay__zone');
       if (!target) return;
-      pointerDownInfo = { x: e.clientX, y: e.clientY, zone: target.dataset.zone, t: Date.now() };
+      pointerDownInfo = {
+        x: e.clientX,
+        y: e.clientY,
+        zone: target.dataset.zone,
+        pointerType: e.pointerType,
+        t: Date.now(),
+      };
     }, { passive: true });
 
     overlay.addEventListener('pointerup', (e) => {
       if (!pointerDownInfo) return;
-      const target = e.target.closest('.tap-overlay__zone');
       const dx = e.clientX - pointerDownInfo.x;
       const dy = e.clientY - pointerDownInfo.y;
       const dt = Date.now() - pointerDownInfo.t;
+      const zone = pointerDownInfo.zone;
+      const pointerType = pointerDownInfo.pointerType || e.pointerType;
       pointerDownInfo = null;
 
-      // Treat as a tap only if movement is small and gesture is short.
       if (Math.hypot(dx, dy) > 16 || dt > 600) return;
-      if (!target) return;
-      handleZone(target.dataset.zone);
+      if (!zone) return;
+
+      if (zone === 'center') {
+        togglePlayPause();
+        return;
+      }
+
+      handleSideDoubleTap(zone, pointerType);
     }, { passive: true });
+
+    overlay.addEventListener('dblclick', (e) => {
+      const target = e.target.closest('.tap-overlay__zone');
+      if (!target) return;
+      const zone = target.dataset.zone;
+      e.preventDefault();
+      sideTapState = null;
+
+      if (zone === 'left' || zone === 'right') {
+        seekSide(zone);
+      }
+    });
 
     overlay.addEventListener('pointercancel', () => { pointerDownInfo = null; });
     overlay.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1089,33 +1269,25 @@
 
     video.addEventListener('webkitbeginfullscreen', () => {
       App.isIOSNativeFullscreen = true;
+      syncImmersiveMode();
       if (App.fsCustomButton) App.fsCustomButton.setExpanded(true);
     });
 
     video.addEventListener('webkitendfullscreen', () => {
       App.isIOSNativeFullscreen = false;
+      syncImmersiveMode();
       if (App.fsCustomButton) App.fsCustomButton.setExpanded(false);
     });
   }
 
   function enterIOSNativeFullscreen(video) {
     if (typeof video.webkitEnterFullscreen !== 'function') return false;
-
-    const enter = () => {
-      try { video.webkitEnterFullscreen(); } catch (_e) { /* noop */ }
-    };
-
-    if (video.paused) {
-      const p = video.play();
-      if (p && typeof p.then === 'function') {
-        p.then(enter).catch(enter);
-      } else {
-        enter();
-      }
-    } else {
-      enter();
+    try {
+      video.webkitEnterFullscreen();
+      return true;
+    } catch (_e) {
+      return false;
     }
-    return true;
   }
 
   function exitIOSNativeFullscreen(video) {
@@ -1128,10 +1300,21 @@
     }
   }
 
+  function syncImmersiveMode() {
+    const immersive = App.isFullWindow || isInFullscreen() || App.isIOSNativeFullscreen;
+    document.documentElement.classList.toggle('is-immersive', immersive);
+    document.body.classList.toggle('is-immersive', immersive);
+    if (App.elements.playerStage) {
+      App.elements.playerStage.classList.toggle('is-docked-controls', !immersive);
+    }
+    syncImmersiveControls();
+    if (App.dockedControlsHeightSync) App.dockedControlsHeightSync();
+  }
+
   function enterFullWindow() {
     App.isFullWindow = true;
     App.elements.app.classList.add('is-fullwindow');
-    document.body.classList.add('is-fullwindow');
+    syncImmersiveMode();
     if (App.fsCustomButton) App.fsCustomButton.setExpanded(true);
   }
 
@@ -1139,7 +1322,7 @@
     if (!App.isFullWindow) return;
     App.isFullWindow = false;
     App.elements.app.classList.remove('is-fullwindow');
-    document.body.classList.remove('is-fullwindow');
+    syncImmersiveMode();
     if (App.fsCustomButton && !App.isIOSNativeFullscreen && !isInFullscreen()) {
       App.fsCustomButton.setExpanded(false);
     }
@@ -1150,6 +1333,14 @@
       document.fullscreenElement ||
       document.webkitFullscreenElement ||
       document.webkitCurrentFullScreenElement
+    );
+  }
+
+  function isAppFullscreen() {
+    const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    return Boolean(
+      fsEl &&
+      (fsEl === App.elements.playerStage || fsEl.contains(App.elements.playerStage))
     );
   }
 
@@ -1176,14 +1367,20 @@
       return;
     }
 
-    const playerEl = player.el();
+    const fsTarget = App.elements.playerStage;
     if (!isInFullscreen()) {
-      const req = playerEl.requestFullscreen || playerEl.webkitRequestFullscreen || playerEl.webkitRequestFullScreen;
+      const req = fsTarget && (
+        fsTarget.requestFullscreen ||
+        fsTarget.webkitRequestFullscreen ||
+        fsTarget.webkitRequestFullScreen
+      );
       if (req) {
-        try { req.call(playerEl); } catch (_e) { /* noop */ }
-      } else {
-        enterFullWindow();
+        try {
+          req.call(fsTarget);
+          return;
+        } catch (_e) { /* fallback below */ }
       }
+      enterFullWindow();
     } else {
       const exit = document.exitFullscreen || document.webkitExitFullscreen || document.webkitCancelFullScreen;
       if (exit) {
@@ -1195,8 +1392,9 @@
   // Keep CSS class in sync with native fullscreen events
   function attachFullscreenListeners() {
     const sync = () => {
-      const isFs = isInFullscreen();
+      const isFs = isAppFullscreen();
       App.elements.app.classList.toggle('is-fullscreen', isFs);
+      syncImmersiveMode();
       if (App.fsCustomButton) {
         App.fsCustomButton.setExpanded(isFs || App.isFullWindow || App.isIOSNativeFullscreen);
       }
@@ -1232,6 +1430,7 @@
     document.addEventListener('player:toggle-fullscreen', toggleFullscreen);
     document.addEventListener('player:toggle-pip', () => { togglePictureInPicture(); });
     attachFullscreenListeners();
+    setupImmersiveControlAutoHide();
 
     // Click-outside for the series dropdown
     document.addEventListener('click', (e) => {
@@ -1292,7 +1491,7 @@
         if (!App.elements.seriesSheet.hidden) closeSheet();
         if (!App.elements.sleepPopover.hidden) closeSleepPopover();
         if (!App.elements.seriesDropdown.hidden) closeSeriesDropdown();
-        if (App.isFullWindow || App.isIOSNativeFullscreen) toggleFullscreen();
+        if (App.isFullWindow || App.isIOSNativeFullscreen || isAppFullscreen()) toggleFullscreen();
       }
     });
   }

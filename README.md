@@ -112,6 +112,8 @@ npx serve .
   работает корректно.
 - AirPlay‑кнопка появляется только при доступности AirPlay
   (`webkitplaybacktargetavailabilitychanged`).
+- Картинка в картинке (PiP) недоступна в PWA («На экран Домой») — ограничение
+  WebKit; кнопка скрыта в standalone‑режиме. В Safari и на desktop PiP работает.
 
 ## Поддерживаемые браузеры
 
